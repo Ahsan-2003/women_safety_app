@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:women_safety_app/screens/home_screen.dart';
 import '../providers/auth_provider.dart';
-import 'home_screen.dart';
 
 class OTPScreen extends StatefulWidget {
   final String phoneNumber;
@@ -92,11 +92,11 @@ class _OTPScreenState extends State<OTPScreen> {
     });
 
     if (success) {
-      // Navigate to home and clear navigation stack
+      // ✅ SUCCESS: Navigate to HomeScreen and clear the stack
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
-        (route) => false,
+        (route) => false, // This removes all previous routes
       );
     } else {
       // Show error
@@ -111,7 +111,7 @@ class _OTPScreenState extends State<OTPScreen> {
         ),
       );
 
-      // Clear all fields
+      // Clear all fields for retry
       for (var c in _controllers) {
         c.clear();
       }
@@ -234,11 +234,10 @@ class _OTPScreenState extends State<OTPScreen> {
 
             const SizedBox(height: 30),
 
-            // Verify Button (shown when verifying)
+            // Loading indicator when verifying
             if (_isVerifying)
               const Center(child: CircularProgressIndicator())
             else ...[
-              // Instructions
               Center(
                 child: Text(
                   'Enter the 6-digit code',

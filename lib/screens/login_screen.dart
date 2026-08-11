@@ -36,12 +36,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _sendOTP() async {
     if (_formKey.currentState!.validate()) {
-      // Remove any spaces or special characters
       String phoneNumber = _phoneController.text.trim().replaceAll(
         RegExp(r'[\s\-\(\)]'),
         '',
       );
       String fullNumber = '$_selectedCountryCode$phoneNumber';
+
+      print('📞 SENDING OTP TO: $fullNumber'); // ADD THIS DEBUG LINE
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.sendOTP(fullNumber);
@@ -49,7 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (authProvider.error != null) {
-        // Show error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(authProvider.error!),
@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       } else {
-        // Navigate to OTP screen
+        print('📱 NAVIGATING TO OTP SCREEN'); // ADD THIS DEBUG LINE
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => OTPScreen(phoneNumber: fullNumber)),
