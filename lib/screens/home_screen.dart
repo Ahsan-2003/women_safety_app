@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:women_safety_app/screens/login_screen.dart';
 import '../providers/auth_provider.dart';
+import 'login_screen.dart';
+import 'contacts_screen.dart'; // ADD THIS
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -28,7 +29,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ],
-            // In the PopupMenuButton onSelected callback:
             onSelected: (value) async {
               if (value == 'signout') {
                 final confirm = await showDialog<bool>(
@@ -54,7 +54,6 @@ class HomeScreen extends StatelessWidget {
 
                 if (confirm == true) {
                   await authProvider.signOut();
-                  // Navigate to LoginScreen and clear stack
                   if (context.mounted) {
                     Navigator.pushAndRemoveUntil(
                       context,
@@ -123,11 +122,55 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              // Sign Out Button (for easy testing)
+              // Menu Options
+              _buildMenuButton(
+                context,
+                icon: Icons.people,
+                title: 'Trusted Contacts',
+                subtitle: 'Manage your emergency contacts',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ContactsScreen()),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildMenuButton(
+                context,
+                icon: Icons.directions_walk,
+                title: 'Walk With Me',
+                subtitle: 'Start a safety session',
+                onTap: () {
+                  // Coming in next feature
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Coming soon!')));
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildMenuButton(
+                context,
+                icon: Icons.warning_amber,
+                title: 'SOS',
+                subtitle: 'Emergency alert settings',
+                onTap: () {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Coming soon!')));
+                },
+              ),
+
+              const Spacer(),
+
+              // Sign Out Button
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  // Same for the bottom Sign Out button:
                   onPressed: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
@@ -178,28 +221,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              const Spacer(),
-
-              // Placeholder for future features
-              Column(
-                children: [
-                  Icon(Icons.construction, size: 60, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'More features coming soon',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Trusted Contacts • Walk With Me • SOS\nCheck-in Timer • Fake Call',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
+              const SizedBox(height: 16),
               Text(
                 'Version 1.0.0',
                 style: TextStyle(color: Colors.grey[400], fontSize: 12),
@@ -207,6 +229,40 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // Menu button widget
+  Widget _buildMenuButton(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+        ),
+        trailing: const Icon(Icons.chevron_right),
       ),
     );
   }
