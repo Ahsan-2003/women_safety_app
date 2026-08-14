@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:women_safety_app/screens/start_session_screen.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 import 'contacts_screen.dart'; // ADD THIS
@@ -144,10 +145,12 @@ class HomeScreen extends StatelessWidget {
                 title: 'Walk With Me',
                 subtitle: 'Start a safety session',
                 onTap: () {
-                  // Coming in next feature
-                  ScaffoldMessenger.of(
+                  Navigator.push(
                     context,
-                  ).showSnackBar(const SnackBar(content: Text('Coming soon!')));
+                    MaterialPageRoute(
+                      builder: (_) => const StartSessionScreen(),
+                    ),
+                  );
                 },
               ),
 
