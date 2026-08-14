@@ -46,6 +46,9 @@ dependencies:
   uuid: ^4.6.0
   intl: ^0.20.3
   permission_handler: ^13.0.1
+  flutter_sms: ^3.0.1
+  audioplayers: ^6.8.1
+  torch_light: ^2.0.0
   # firebase_app_check: ^0.4.6
   # android_app_checker: ^0.0.5
 
