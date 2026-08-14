@@ -26,6 +26,20 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	
+	<!-- 🔥 LOCATION PERMISSIONS - Add these keys here 🔥 -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>SafeWalk needs your location to share with trusted contacts during safety walks.</string>
+	
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>SafeWalk needs background location access to keep you safe even when the app is in background.</string>
+	
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>SafeWalk needs background location for continuous safety monitoring.</string>
+	
+	<key>NSMotionUsageDescription</key>
+	<string>SafeWalk uses motion detection to optimize battery usage during walks.</string>
+	
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
