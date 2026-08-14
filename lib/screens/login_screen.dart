@@ -16,16 +16,26 @@ class _LoginScreenState extends State<LoginScreen> {
   String _selectedCountryCode = '+1';
 
   final List<Map<String, String>> _countryCodes = [
-    {'code': '+1', 'country': '🇺🇸 US/Canada'},
+    {'code': '+1', 'country': '🇺🇸 US'},
     {'code': '+44', 'country': '🇬🇧 UK'},
     {'code': '+91', 'country': '🇮🇳 India'},
+    {'code': '+92', 'country': '🇵🇰 Pakistan'},
     {'code': '+61', 'country': '🇦🇺 Australia'},
     {'code': '+65', 'country': '🇸🇬 Singapore'},
     {'code': '+971', 'country': '🇦🇪 UAE'},
     {'code': '+63', 'country': '🇵🇭 Philippines'},
-    {'code': '+92', 'country': '🇵🇰 Pakistan'},
     {'code': '+880', 'country': '🇧🇩 Bangladesh'},
     {'code': '+234', 'country': '🇳🇬 Nigeria'},
+    {'code': '+20', 'country': '🇪🇬 Egypt'},
+    {'code': '+90', 'country': '🇹🇷 Turkey'},
+    {'code': '+49', 'country': '🇩🇪 Germany'},
+    {'code': '+33', 'country': '🇫🇷 France'},
+    {'code': '+81', 'country': '🇯🇵 Japan'},
+    {'code': '+82', 'country': '🇰🇷 South Korea'},
+    {'code': '+86', 'country': '🇨🇳 China'},
+    {'code': '+7', 'country': '🇷🇺 Russia'},
+    {'code': '+55', 'country': '🇧🇷 Brazil'},
+    {'code': '+52', 'country': '🇲🇽 Mexico'},
   ];
 
   @override
