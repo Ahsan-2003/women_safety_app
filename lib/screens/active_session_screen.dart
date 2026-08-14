@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
+import 'home_screen.dart'; // ADD THIS IMPORT
 
 class ActiveSessionScreen extends StatelessWidget {
   const ActiveSessionScreen({super.key});
@@ -12,9 +13,9 @@ class ActiveSessionScreen extends StatelessWidget {
         // If no active session, go back to home
         if (!sessionProvider.isSessionActive) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushNamedAndRemoveUntil(
+            Navigator.pushAndRemoveUntil(
               context,
-              '/home',
+              MaterialPageRoute(builder: (_) => const HomeScreen()), // FIXED
               (route) => false,
             );
           });
@@ -127,9 +128,11 @@ class ActiveSessionScreen extends StatelessWidget {
                       onPressed: () async {
                         await sessionProvider.markSafe();
                         if (context.mounted) {
-                          Navigator.pushNamedAndRemoveUntil(
+                          Navigator.pushAndRemoveUntil(
                             context,
-                            '/home',
+                            MaterialPageRoute(
+                              builder: (_) => const HomeScreen(),
+                            ), // FIXED
                             (route) => false,
                           );
                         }
