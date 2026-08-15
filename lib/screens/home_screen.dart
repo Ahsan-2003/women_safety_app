@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:women_safety_app/screens/sos_screen.dart';
 import 'package:women_safety_app/screens/start_session_screen.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
@@ -159,12 +160,13 @@ class HomeScreen extends StatelessWidget {
               _buildMenuButton(
                 context,
                 icon: Icons.warning_amber,
-                title: 'SOS',
-                subtitle: 'Emergency alert settings',
+                title: 'SOS Emergency',
+                subtitle: 'Send immediate help alert',
                 onTap: () {
-                  ScaffoldMessenger.of(
+                  Navigator.push(
                     context,
-                  ).showSnackBar(const SnackBar(content: Text('Coming soon!')));
+                    MaterialPageRoute(builder: (_) => const SOSScreen()),
+                  );
                 },
               ),
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:women_safety_app/screens/sos_screen.dart';
 import '../providers/session_provider.dart';
 import 'home_screen.dart'; // ADD THIS IMPORT
 
@@ -166,12 +167,10 @@ class ActiveSessionScreen extends StatelessWidget {
                     height: 60,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // SOS feature - coming next
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('SOS triggered! Contacts notified.'),
-                            backgroundColor: Colors.red,
-                          ),
+                        // Navigate to SOS screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SOSScreen()),
                         );
                       },
                       icon: const Icon(Icons.warning, size: 28),
