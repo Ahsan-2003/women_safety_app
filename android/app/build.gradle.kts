@@ -15,6 +15,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -48,6 +49,8 @@ flutter {
 }
 
 dependencies {
+    // For AGP 7.4+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // Import the BoM for the Firebase platform
     implementation(platform("com.google.firebase:firebase-bom:34.17.0"))
 }
