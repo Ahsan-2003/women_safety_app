@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:women_safety_app/screens/checkin_timer_screen.dart';
+import 'package:women_safety_app/screens/fake_call_screen.dart';
 import 'package:women_safety_app/screens/sos_screen.dart';
 import 'package:women_safety_app/screens/start_session_screen.dart';
 import 'package:women_safety_app/services/notification_service.dart';
@@ -62,7 +63,7 @@ class HomeScreen extends StatelessWidget {
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
-                          (route) => false,
+                      (route) => false,
                     );
                   }
                 }
@@ -74,7 +75,8 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: SingleChildScrollView(  // 🔥 FIX: Added SingleChildScrollView
+          child: SingleChildScrollView(
+            // 🔥 FIX: Added SingleChildScrollView
             child: Column(
               children: [
                 const SizedBox(height: 20),
@@ -190,8 +192,22 @@ class HomeScreen extends StatelessWidget {
                   },
                 ),
 
-                const SizedBox(height: 24),  // Reduced from Spacer()
+                const SizedBox(height: 24), // Reduced from Spacer()
 
+                _buildMenuButton(
+                  context,
+                  icon: Icons.phone_in_talk,
+                  title: 'Fake Call',
+                  subtitle: 'Simulate incoming call',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const FakeCallScreen()),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 24), // Reduced from Spacer()
                 // Test Notification Button (Optional - Remove in Production)
                 Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -244,7 +260,7 @@ class HomeScreen extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (_) => const LoginScreen(),
                             ),
-                                (route) => false,
+                            (route) => false,
                           );
                         }
                       }
@@ -279,12 +295,12 @@ class HomeScreen extends StatelessWidget {
 
   // Menu button widget
   Widget _buildMenuButton(
-      BuildContext context, {
-        required IconData icon,
-        required String title,
-        required String subtitle,
-        required VoidCallback onTap,
-      }) {
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
     return Card(
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
