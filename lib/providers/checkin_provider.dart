@@ -28,12 +28,12 @@ class CheckinProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isTimerActive => _activeTimer != null && _activeTimer!.isActive;
 
-  // Initialize notification service
+  // Initialize
   Future<void> initialize() async {
     await _notificationService.initialize();
   }
 
-  // Start check-in timer
+  // Start check-in timer - SIMPLIFIED, NO NOTIFICATION DEPENDENCY
   Future<bool> startCheckinTimer({required int durationMinutes}) async {
     _isLoading = true;
     _error = null;
@@ -60,24 +60,18 @@ class CheckinProvider extends ChangeNotifier {
         lastKnownLongitude: location?.longitude,
       );
 
+      // Save timer to Firestore
       await _checkinService.createCheckinTimer(timer);
+
       _activeTimer = timer;
       _remainingSeconds = durationMinutes * 60;
       _elapsedSeconds = 0;
 
-      // Schedule notification for when timer expires
-      await _notificationService.scheduleNotification(
-        id: 100,
-        title: 'SafeWalk Check-in',
-        body:
-            'Time is up! Are you safe? If you don\'t respond, we\'ll alert your contacts.',
-        scheduledTime: expectedEnd,
-      );
-      // Schedule reminder notifications
-      await _scheduleReminderNotifications(durationMinutes);
-
-      // Start countdown
+      // Start countdown timer FIRST
       _startCountdown();
+
+      // Try to schedule notifications (won't crash if fails)
+      _scheduleNotificationsSafely(durationMinutes, expectedEnd);
 
       _isLoading = false;
       notifyListeners();
@@ -90,49 +84,49 @@ class CheckinProvider extends ChangeNotifier {
     }
   }
 
-  // Schedule periodic reminders
-  Future<void> _scheduleReminderNotifications(int durationMinutes) async {
-    // Schedule reminders at intervals
-    final now = DateTime.now();
+  // Schedule notifications safely (won't crash app)
+  Future<void> _scheduleNotificationsSafely(
+    int durationMinutes,
+    DateTime expectedEnd,
+  ) async {
+    try {
+      // Only schedule if duration is long enough
+      if (durationMinutes > 5) {
+        final now = DateTime.now();
 
-    // Reminder at halfway point
-    // final halfwayMinutes = (durationMinutes / 2).round();
-    // if (halfwayMinutes > 0) {
-    //   await _notificationService.scheduleNotification(
-    //     id: 101,
-    //     title: 'SafeWalk Reminder',
-    //     body: 'Halfway through your check-in timer. Still safe?',
-    //     scheduledTime: now.add(Duration(minutes: halfwayMinutes)),
-    //   );
-    // }
-    // Schedule halfway reminder
-    final halfway = now.add(Duration(minutes: (durationMinutes / 2).round()));
-    await _notificationService.scheduleNotification(
-      id: 101,
-      title: 'SafeWalk Reminder',
-      body: 'Halfway through your check-in timer. Still safe?',
-      scheduledTime: halfway,
-    );
+        // Halfway reminder
+        final halfwayMinutes = (durationMinutes / 2).round();
+        if (halfwayMinutes > 0) {
+          await _notificationService.scheduleNotification(
+            id: 101,
+            title: 'SafeWalk Reminder',
+            body: 'Halfway through your check-in timer. Still safe?',
+            scheduledTime: now.add(Duration(minutes: halfwayMinutes)),
+          );
+        }
 
-    // Reminder 5 minutes before end
-    // final fiveMinBefore = durationMinutes - 5;
-    // if (fiveMinBefore > 0) {
-    //   await _notificationService.scheduleNotification(
-    //     id: 102,
-    //     title: 'SafeWalk Reminder',
-    //     body: '5 minutes left on your check-in timer.',
-    //     scheduledTime: now.add(Duration(minutes: fiveMinBefore)),
-    //   );
-    // }
+        // 5-minute warning
+        if (durationMinutes > 10) {
+          await _notificationService.scheduleNotification(
+            id: 102,
+            title: 'SafeWalk Reminder',
+            body: '5 minutes left on your check-in timer.',
+            scheduledTime: expectedEnd.subtract(const Duration(minutes: 5)),
+          );
+        }
+      }
 
-    // Schedule 5-minute warning
-    final fiveMinBefore = const Duration(minutes: 5);
-    await _notificationService.scheduleNotification(
-      id: 102,
-      title: 'SafeWalk Reminder',
-      body: '5 minutes left on your check-in timer.',
-      scheduledTime: now.add(Duration(minutes: fiveMinBefore.inMinutes)),
-    );
+      // Final expiration notification
+      await _notificationService.scheduleNotification(
+        id: 100,
+        title: 'SafeWalk Check-in',
+        body: 'Time is up! Are you safe?',
+        scheduledTime: expectedEnd,
+      );
+    } catch (e) {
+      // Silently fail - countdown still works
+      debugPrint('Notification scheduling failed: $e');
+    }
   }
 
   // Start countdown timer
@@ -158,7 +152,7 @@ class CheckinProvider extends ChangeNotifier {
       // Get last known location
       final location = await _locationService.getCurrentLocation();
 
-      // Send auto-alert
+      // Send auto-alert to Firestore
       await _checkinService.sendAutoAlert(
         timerId: _activeTimer!.timerId,
         latitude: location?.latitude ?? _activeTimer!.lastKnownLatitude ?? 0.0,
@@ -172,15 +166,6 @@ class CheckinProvider extends ChangeNotifier {
         title: 'SAFEWALK ALERT',
         body: 'Check-in timer expired! Alerting your trusted contacts.',
       );
-
-      // Send SMS to contacts
-      final message = _composeAutoAlertMessage(
-        location?.latitude ?? _activeTimer!.lastKnownLatitude ?? 0.0,
-        location?.longitude ?? _activeTimer!.lastKnownLongitude ?? 0.0,
-      );
-
-      // Note: SMS sending needs contact list from provider
-      // This will be implemented in the full version
 
       _activeTimer = null;
       _remainingSeconds = 0;
@@ -198,8 +183,6 @@ class CheckinProvider extends ChangeNotifier {
 
     try {
       await _checkinService.markSafe(_activeTimer!.timerId);
-
-      // Cancel all notifications
       await _notificationService.cancelAllNotifications();
 
       _countdownTimer?.cancel();
@@ -221,21 +204,6 @@ class CheckinProvider extends ChangeNotifier {
     _remainingSeconds = 0;
     _elapsedSeconds = 0;
     notifyListeners();
-  }
-
-  // Compose auto-alert message
-  String _composeAutoAlertMessage(double lat, double lng) {
-    return '''🚨 SAFEWALK AUTO-ALERT 🚨
-    
-I didn't check in on time!
-
-📍 Last known location:
-Latitude: $lat
-Longitude: $lng
-Maps: https://maps.google.com/?q=$lat,$lng
-
-Please check on me immediately.
-''';
   }
 
   // Format time

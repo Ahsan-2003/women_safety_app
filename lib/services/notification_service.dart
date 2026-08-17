@@ -151,7 +151,7 @@ class NotificationService {
       body: body,
       scheduledDate: scheduledTZTime,
       notificationDetails: notificationDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       payload: payload,
     );
   }
