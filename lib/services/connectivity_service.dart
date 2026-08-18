@@ -12,6 +12,9 @@ class ConnectivityService {
   bool get isOnline => _isOnline;
   ConnectivityResult get connectionType => _connectionType;
 
+  // Expose connectivity for listening
+  Connectivity get connectivity => _connectivity;
+
   // Initialize connectivity monitoring
   void initialize() {
     _checkInitialConnection();
@@ -44,7 +47,7 @@ class ConnectivityService {
     });
   }
 
-  // Check if connected to internet (not just network)
+  // Check if connected to internet
   Future<bool> hasInternetConnection() async {
     try {
       final results = await _connectivity.checkConnectivity();
