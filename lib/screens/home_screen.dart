@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:women_safety_app/screens/checkin_timer_screen.dart';
 import 'package:women_safety_app/screens/fake_call_screen.dart';
+import 'package:women_safety_app/screens/route_monitoring_screen.dart';
 import 'package:women_safety_app/screens/sos_screen.dart';
 import 'package:women_safety_app/screens/start_session_screen.dart';
 import 'package:women_safety_app/services/notification_service.dart';
@@ -203,6 +204,23 @@ class HomeScreen extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const FakeCallScreen()),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 24), // Reduced from Spacer()
+
+                _buildMenuButton(
+                  context,
+                  icon: Icons.route,
+                  title: 'Route Monitoring',
+                  subtitle: 'Detect off-route deviation',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RouteMonitoringScreen(),
+                      ),
                     );
                   },
                 ),
