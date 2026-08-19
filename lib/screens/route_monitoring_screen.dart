@@ -85,70 +85,99 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
       listen: false,
     );
 
-    // Get current location
-    final currentLocation = await locationProvider.getCurrentLocation();
+    try {
+      // Get current location
+      final currentLocation = await locationProvider.getCurrentLocation();
 
-    if (currentLocation == null) {
+      if (currentLocation == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                locationProvider.error ?? 'Unable to get your location',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Show loading message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Unable to get your current location. Please enable GPS.',
-            ),
-            backgroundColor: Colors.red,
+            content: Text('Finding destination...'),
+            duration: Duration(seconds: 1),
           ),
         );
       }
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
 
-    // Get destination coordinates from address
-    final destinationLocation = await locationProvider
-        .getCoordinatesFromAddress(destination);
+      // Get destination coordinates from address
+      final destinationLocation = await locationProvider
+          .getCoordinatesFromAddress(destination);
 
-    if (destinationLocation == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not find that destination. Try a different address.',
+      if (destinationLocation == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Could not find "$destination". Try a more specific address.',
+              ),
+              backgroundColor: Colors.red,
             ),
-            backgroundColor: Colors.red,
-          ),
-        );
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
       }
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
 
-    // Start route monitoring
-    final success = await routeProvider.startRouteMonitoring(
-      sessionId: 'standalone',
-      startLat: currentLocation.latitude,
-      startLng: currentLocation.longitude,
-      endLat: destinationLocation.latitude,
-      endLng: destinationLocation.longitude,
-      travelMode: _selectedMode,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(routeProvider.error ?? 'Failed to start monitoring'),
-          backgroundColor: Colors.red,
-        ),
+      // Start route monitoring
+      final success = await routeProvider.startRouteMonitoring(
+        sessionId: 'standalone',
+        startLat: currentLocation.latitude,
+        startLng: currentLocation.longitude,
+        endLat: destinationLocation['latitude']!,
+        endLng: destinationLocation['longitude']!,
+        travelMode: _selectedMode,
       );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(routeProvider.error ?? 'Failed to start monitoring'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else {
+        // Success - show confirmation
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Route monitoring started!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 

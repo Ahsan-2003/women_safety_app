@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:geocoding/geocoding.dart' as geocoding;
 
 class LocationProvider extends ChangeNotifier {
+  // geocoding ^5.0.0 requires an instance instead of top-level functions
+  final geocoding.Geocoding _geocodingClient = geocoding.Geocoding();
+
   double? _currentLatitude;
   double? _currentLongitude;
   String? _currentAddress;
@@ -36,16 +39,24 @@ class LocationProvider extends ChangeNotifier {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _error = 'Location permission permanently denied';
+        _error =
+            'Location permission permanently denied. Please enable in settings.';
+        _isLoading = false;
+        notifyListeners();
+        return null;
+      }
+
+      // Check if location service is enabled
+      final isLocationEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isLocationEnabled) {
+        _error = 'Location services are disabled. Please enable GPS.';
         _isLoading = false;
         notifyListeners();
         return null;
       }
 
       // Get current position
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final position = await Geolocator.getCurrentPosition();
 
       _currentLatitude = position.latitude;
       _currentLongitude = position.longitude;
@@ -67,56 +78,108 @@ class LocationProvider extends ChangeNotifier {
   // Get address from coordinates
   Future<void> _getAddressFromCoordinates(double lat, double lng) async {
     try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lng);
+      // ✅ geocoding ^5.0.0: call via the Geocoding instance
+      List<geocoding.Placemark> placemarks = await _geocodingClient
+          .placemarkFromCoordinates(lat, lng);
 
       if (placemarks.isNotEmpty) {
         final placemark = placemarks.first;
-        _currentAddress = [
-          placemark.street,
-          placemark.subLocality,
-          placemark.locality,
-        ].where((part) => part != null && part.isNotEmpty).join(', ');
+
+        // Build address string
+        final addressParts = <String>[];
+
+        if (placemark.street != null && placemark.street!.isNotEmpty) {
+          addressParts.add(placemark.street!);
+        }
+        if (placemark.subLocality != null &&
+            placemark.subLocality!.isNotEmpty) {
+          addressParts.add(placemark.subLocality!);
+        }
+        if (placemark.locality != null && placemark.locality!.isNotEmpty) {
+          addressParts.add(placemark.locality!);
+        }
+        if (placemark.administrativeArea != null &&
+            placemark.administrativeArea!.isNotEmpty) {
+          addressParts.add(placemark.administrativeArea!);
+        }
+
+        if (addressParts.isNotEmpty) {
+          _currentAddress = addressParts.join(', ');
+        } else {
+          _currentAddress = 'Current Location';
+        }
       } else {
         _currentAddress = 'Current Location';
       }
+
+      notifyListeners();
     } catch (e) {
-      _currentAddress = 'Location: $lat, $lng';
+      debugPrint('Geocoding error: $e');
+      _currentAddress = 'Current Location';
+      notifyListeners();
     }
   }
 
-  // Get coordinates from address
-  Future<Position?> getCoordinatesFromAddress(String address) async {
+  // Get coordinates from address - RETURNS SIMPLE MAP INSTEAD OF POSITION
+  Future<Map<String, double>?> getCoordinatesFromAddress(String address) async {
     try {
-      List<Location> locations = await locationFromAddress(address);
+      // ✅ geocoding ^5.0.0: call via the Geocoding instance
+      List<geocoding.Location> locations = await _geocodingClient
+          .locationFromAddress(address);
 
       if (locations.isNotEmpty) {
         final location = locations.first;
-        return Position(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          timestamp: DateTime.now(),
-          accuracy: 0,
-          altitude: 0,
-          altitudeAccuracy: 0,
-          heading: 0,
-          headingAccuracy: 0,
-          speed: 0,
-          speedAccuracy: 0,
-        );
+        return {'latitude': location.latitude, 'longitude': location.longitude};
       }
       return null;
     } catch (e) {
+      debugPrint('Failed to get coordinates: $e');
       return null;
     }
   }
 
-  // Get location stream
+  // Get location stream for monitoring
   Stream<Position> getLocationStream() {
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 10,
+    return Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
     );
+  }
 
-    return Geolocator.getPositionStream(locationSettings: locationSettings);
+  // Get simple location as map
+  Future<Map<String, double>?> getLocationCoordinates() async {
+    final position = await getCurrentLocation();
+    if (position != null) {
+      return {'latitude': position.latitude, 'longitude': position.longitude};
+    }
+    return null;
+  }
+
+  // Calculate distance between two points
+  double calculateDistance({
+    required double startLat,
+    required double startLng,
+    required double endLat,
+    required double endLng,
+  }) {
+    return Geolocator.distanceBetween(startLat, startLng, endLat, endLng);
+  }
+
+  // Check if location services are enabled
+  Future<bool> isLocationServiceEnabled() async {
+    return await Geolocator.isLocationServiceEnabled();
+  }
+
+  // Open location settings
+  Future<void> openLocationSettings() async {
+    await Geolocator.openLocationSettings();
+  }
+
+  // Clear error
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }
