@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/route_model.dart';
 import '../services/route_service.dart';
-import '../services/location_service.dart';
 import '../services/notification_service.dart';
+import 'location_provider.dart';
 
 class RouteProvider extends ChangeNotifier {
   final RouteService _routeService = RouteService();
-  final LocationService _locationService = LocationService();
   final NotificationService _notificationService = NotificationService();
+  final LocationProvider _locationProvider = LocationProvider();
   final Uuid _uuid = const Uuid();
 
   RouteModel? _activeRoute;
@@ -18,20 +18,25 @@ class RouteProvider extends ChangeNotifier {
   bool _isMonitoring = false;
   bool _isDeviated = false;
   String? _error;
+  String? _startAddress;
+  String? _endAddress;
 
   RouteModel? get activeRoute => _activeRoute;
   double get currentDeviation => _currentDeviation;
   bool get isMonitoring => _isMonitoring;
   bool get isDeviated => _isDeviated;
   String? get error => _error;
+  String? get startAddress => _startAddress;
+  String? get endAddress => _endAddress;
 
-  // Start route monitoring
+  // Start route monitoring with automatic location detection
   Future<bool> startRouteMonitoring({
     required String sessionId,
     required double startLat,
     required double startLng,
     required double endLat,
     required double endLng,
+    String? travelMode = 'walking',
   }) async {
     try {
       _error = null;
@@ -50,7 +55,7 @@ class RouteProvider extends ChangeNotifier {
         routeId: _uuid.v4(),
         sessionId: sessionId,
         waypoints: waypoints,
-        deviationThreshold: 200.0, // 200 meters
+        deviationThreshold: 200.0,
         createdAt: DateTime.now(),
       );
 
@@ -67,7 +72,7 @@ class RouteProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to start monitoring: $e';
       notifyListeners();
       return false;
     }
@@ -77,24 +82,22 @@ class RouteProvider extends ChangeNotifier {
   void _startLocationMonitoring() {
     _locationSubscription?.cancel();
 
-    _locationSubscription = _locationService.getLocationStream().listen(
-      (location) async {
+    _locationSubscription = _locationProvider.getLocationStream().listen(
+      (position) async {
         if (_activeRoute == null) return;
 
-        // Calculate deviation from expected route
         final deviation = _routeService.calculateDeviation(
-          currentLat: location.latitude,
-          currentLng: location.longitude,
+          currentLat: position.latitude,
+          currentLng: position.longitude,
           routePoints: _activeRoute!.waypoints,
         );
 
         _currentDeviation = deviation;
 
-        // Check if deviation exceeds threshold
         if (deviation > _activeRoute!.deviationThreshold && !_isDeviated) {
           await _handleDeviation(
-            location.latitude,
-            location.longitude,
+            position.latitude,
+            position.longitude,
             deviation,
           );
         }
@@ -117,7 +120,6 @@ class RouteProvider extends ChangeNotifier {
     _isDeviated = true;
 
     try {
-      // Create deviation alert
       final alert = DeviationAlert(
         alertId: _uuid.v4(),
         sessionId: _activeRoute!.sessionId,
@@ -129,15 +131,13 @@ class RouteProvider extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
 
-      // Save alert to Firestore
       await _routeService.saveDeviationAlert(alert);
 
-      // Show notification
       await _notificationService.showNotification(
         id: 300,
-        title: 'ROUTE DEVIATION DETECTED',
+        title: '⚠️ ROUTE DEVIATION',
         body:
-            'You are ${deviation.round()} meters off your expected route. Contacts will be notified.',
+            'You are ${deviation.round()} meters off route. Contacts notified.',
       );
 
       notifyListeners();
@@ -157,7 +157,7 @@ class RouteProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Reset deviation flag (after user confirms they're okay)
+  // Reset deviation flag
   void resetDeviation() {
     _isDeviated = false;
     notifyListeners();
