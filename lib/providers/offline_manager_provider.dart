@@ -19,7 +19,7 @@ class OfflineManagerProvider extends ChangeNotifier {
 
   bool _isOnline = true;
   bool _isOfflineMode = false;
-  List<SmsQueueItem> _smsQueue = [];
+  final List<SmsQueueItem> _smsQueue = [];
   StreamSubscription? _connectivitySubscription;
   String? _error;
 
