@@ -72,6 +72,13 @@ class AuthGate extends StatelessWidget {
         // If user is logged in, show HomeScreen
         // This handles: app start with saved login, and auto-verify
         if (authProvider.isLoggedIn) {
+          // Initialize offline manager when user is logged in
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Provider.of<OfflineManagerProvider>(
+              context,
+              listen: false,
+            ).initialize();
+          });
           return const HomeScreen();
         }
 
