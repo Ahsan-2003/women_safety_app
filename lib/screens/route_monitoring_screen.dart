@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/route_provider.dart';
 import '../providers/location_provider.dart';
@@ -15,7 +16,6 @@ class _RouteMonitoringScreenState extends State<RouteMonitoringScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-detect current location when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<LocationProvider>(
         context,
@@ -29,7 +29,7 @@ class _RouteMonitoringScreenState extends State<RouteMonitoringScreen> {
     return Consumer<RouteProvider>(
       builder: (context, routeProvider, child) {
         if (routeProvider.isMonitoring) {
-          return const ActiveRouteMonitoringScreen();
+          return const ActiveRouteMapScreen();
         }
         return const RouteSetupScreen();
       },
@@ -49,12 +49,6 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
   final _destinationController = TextEditingController();
   String _selectedMode = 'walking';
   bool _isLoading = false;
-
-  final List<Map<String, String>> _travelModes = [
-    {'value': 'walking', 'label': '🚶 Walking', 'icon': 'directions_walk'},
-    {'value': 'driving', 'label': '🚗 Driving', 'icon': 'directions_car'},
-    {'value': 'transit', 'label': '🚌 Transit', 'icon': 'directions_bus'},
-  ];
 
   @override
   void dispose() {
@@ -86,7 +80,6 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
     );
 
     try {
-      // Get current location
       final currentLocation = await locationProvider.getCurrentLocation();
 
       if (currentLocation == null) {
@@ -106,44 +99,40 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
         return;
       }
 
-      // Show loading message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Finding destination...'),
-            duration: Duration(seconds: 1),
-          ),
+      Map<String, double>? destinationCoords;
+
+      try {
+        destinationCoords = await locationProvider.getCoordinatesFromAddress(
+          destination,
         );
+      } catch (e) {
+        destinationCoords = null;
       }
 
-      // Get destination coordinates from address
-      final destinationLocation = await locationProvider
-          .getCoordinatesFromAddress(destination);
+      // Fallback for testing
+      if (destinationCoords == null) {
+        destinationCoords = {
+          'latitude': currentLocation.latitude + 0.01,
+          'longitude': currentLocation.longitude + 0.01,
+        };
 
-      if (destinationLocation == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Could not find "$destination". Try a more specific address.',
-              ),
-              backgroundColor: Colors.red,
+              content: Text('Using test destination 1km away'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 2),
             ),
           );
         }
-        setState(() {
-          _isLoading = false;
-        });
-        return;
       }
 
-      // Start route monitoring
       final success = await routeProvider.startRouteMonitoring(
         sessionId: 'standalone',
         startLat: currentLocation.latitude,
         startLng: currentLocation.longitude,
-        endLat: destinationLocation['latitude']!,
-        endLng: destinationLocation['longitude']!,
+        endLat: destinationCoords['latitude']!,
+        endLng: destinationCoords['longitude']!,
         travelMode: _selectedMode,
       );
 
@@ -158,14 +147,6 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
           SnackBar(
             content: Text(routeProvider.error ?? 'Failed to start monitoring'),
             backgroundColor: Colors.red,
-          ),
-        );
-      } else {
-        // Success - show confirmation
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Route monitoring started!'),
-            backgroundColor: Colors.green,
           ),
         );
       }
@@ -184,13 +165,13 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Route Monitoring')),
+      appBar: AppBar(title: const Text('Route Monitoring Setup')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Current Location Card
+            // Current Location
             Consumer<LocationProvider>(
               builder: (context, locationProvider, child) {
                 return Container(
@@ -208,17 +189,15 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'START LOCATION',
+                              'START',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.grey,
                               ),
                             ),
-                            const SizedBox(height: 4),
                             Text(
-                              locationProvider.currentAddress ??
-                                  'Detecting your location...',
+                              locationProvider.currentAddress ?? 'Detecting...',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -226,134 +205,25 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
                           ],
                         ),
                       ),
-                      if (locationProvider.isLoading)
-                        const CircularProgressIndicator(strokeWidth: 2),
                     ],
                   ),
                 );
               },
             ),
 
-            const SizedBox(height: 20),
-
-            // Arrow Down
+            const SizedBox(height: 16),
             const Center(child: Icon(Icons.arrow_downward, color: Colors.grey)),
-
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // Destination Input
-            Text(
-              'Where are you going?',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
             TextField(
               controller: _destinationController,
               decoration: InputDecoration(
-                hintText: 'Enter destination address',
+                hintText: 'Enter destination (e.g., Karachi, Lahore)',
                 prefixIcon: const Icon(Icons.location_on, color: Colors.red),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                helperText: 'Example: Home, Office, Mall, Station',
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Quick Destinations
-            Text(
-              'Quick Options',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _buildQuickDestination('🏠 Home')),
-                const SizedBox(width: 10),
-                Expanded(child: _buildQuickDestination('🏢 Work')),
-                const SizedBox(width: 10),
-                Expanded(child: _buildQuickDestination('🚉 Station')),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // Travel Mode
-            Text(
-              'How are you traveling?',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: _travelModes.map((mode) {
-                final isSelected = _selectedMode == mode['value'];
-                return Expanded(
-                  child: Card(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedMode = mode['value']!;
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Column(
-                          children: [
-                            Icon(
-                              mode['value'] == 'walking'
-                                  ? Icons.directions_walk
-                                  : mode['value'] == 'driving'
-                                  ? Icons.directions_car
-                                  : Icons.directions_bus,
-                              color: isSelected ? Colors.white : null,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              mode['label']!,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : null,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 30),
-
-            // Info Box
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.orange),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'You will be alerted if you go more than 200 meters off your expected route.',
-                      style: TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
               ),
             ),
 
@@ -366,15 +236,11 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
               child: ElevatedButton.icon(
                 onPressed: _isLoading ? null : _startRouteMonitoring,
                 icon: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
                       )
-                    : const Icon(Icons.route),
+                    : const Icon(Icons.map),
                 label: Text(
                   _isLoading ? 'Setting up...' : 'Start Route Monitoring',
                   style: const TextStyle(
@@ -391,185 +257,182 @@ class _RouteSetupScreenState extends State<RouteSetupScreen> {
                 ),
               ),
             ),
+
+            const SizedBox(height: 20),
+
+            // Test hint
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                '💡 For testing, type a city name like "Karachi" or "Lahore". If not found, a test route will be created.',
+                style: TextStyle(fontSize: 13, color: Colors.blue),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildQuickDestination(String label) {
-    return OutlinedButton(
-      onPressed: () {
-        _destinationController.text = label.split(' ').last;
-      },
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Text(label),
-    );
-  }
 }
 
-// ============ ACTIVE MONITORING SCREEN ============
-class ActiveRouteMonitoringScreen extends StatelessWidget {
-  const ActiveRouteMonitoringScreen({super.key});
+// ============ ACTIVE MAP SCREEN ============
+class ActiveRouteMapScreen extends StatelessWidget {
+  const ActiveRouteMapScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Consumer<RouteProvider>(
       builder: (context, routeProvider, child) {
+        GoogleMapController? mapController;
+
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Route Monitoring'),
-            backgroundColor: routeProvider.isDeviated
-                ? Colors.red
-                : Colors.green,
-            foregroundColor: Colors.white,
-          ),
-          body: Column(
+          body: Stack(
             children: [
-              const SizedBox(height: 40),
+              // Google Map
+              GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: routeProvider.startPosition ?? const LatLng(0, 0),
+                  zoom: 15,
+                ),
+                markers: routeProvider.routeMarkers,
+                polylines: routeProvider.routePolylines,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: true,
+                onMapCreated: (controller) {
+                  mapController = controller;
 
-              // Status Icon
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: routeProvider.isDeviated
-                      ? Colors.red.withOpacity(0.1)
-                      : Colors.green.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  routeProvider.isDeviated
-                      ? Icons.warning_amber_rounded
-                      : Icons.check_circle,
-                  size: 60,
-                  color: routeProvider.isDeviated ? Colors.red : Colors.green,
-                ),
+                  // Animate camera to show entire route
+                  _fitRouteInView(controller, routeProvider);
+                },
               ),
 
-              const SizedBox(height: 20),
-
-              // Status Text
-              Text(
-                routeProvider.isDeviated ? 'OFF ROUTE!' : 'ON ROUTE',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: routeProvider.isDeviated ? Colors.red : Colors.green,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // Deviation Distance
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${routeProvider.currentDeviation.round()} meters from route',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-
-              const Spacer(),
-
-              // Warning Message
-              if (routeProvider.isDeviated) ...[
-                Container(
-                  margin: const EdgeInsets.all(20),
-                  padding: const EdgeInsets.all(16),
+              // Top Status Bar
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    '⚠️ You are off your expected route!\n\nYour contacts have been notified.\n\nIf you are safe, tap the button below.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    color: routeProvider.isDeviated ? Colors.red : Colors.green,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
                     ),
                   ),
-                ),
-
-                ElevatedButton.icon(
-                  onPressed: () {
-                    routeProvider.resetDeviation();
-                  },
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text("I'M SAFE - Continue"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 15,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-              ],
-
-              // Stop Monitoring
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Stop Monitoring'),
-                          content: const Text(
-                            'Are you sure you want to stop route monitoring?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.red,
+                  child: Row(
+                    children: [
+                      Icon(
+                        routeProvider.isDeviated
+                            ? Icons.warning
+                            : Icons.check_circle,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              routeProvider.isDeviated
+                                  ? 'OFF ROUTE!'
+                                  : 'ON ROUTE',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              child: const Text('Stop'),
+                            ),
+                            Text(
+                              '${routeProvider.currentDeviation.round()}m deviation',
+                              style: const TextStyle(color: Colors.white70),
                             ),
                           ],
                         ),
-                      );
+                      ),
+                      // Stop Button
+                      IconButton(
+                        icon: const Icon(
+                          Icons.stop_circle,
+                          color: Colors.white,
+                          size: 35,
+                        ),
+                        onPressed: () => _confirmStop(context, routeProvider),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-                      if (confirm == true) {
-                        await routeProvider.stopMonitoring();
-                        if (context.mounted) {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const HomeScreen(),
-                            ),
-                            (route) => false,
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.stop),
-                    label: const Text('Stop Monitoring'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
+              // Bottom Stats Bar
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildStatItem(
+                            icon: Icons.route,
+                            label: 'Total',
+                            value:
+                                '${(routeProvider.totalDistance / 1000).toStringAsFixed(2)} km',
+                          ),
+                          _buildStatItem(
+                            icon: Icons.timelapse,
+                            label: 'Remaining',
+                            value:
+                                '${(routeProvider.remainingDistance / 1000).toStringAsFixed(2)} km',
+                          ),
+                          _buildStatItem(
+                            icon: Icons.speed,
+                            label: 'Deviation',
+                            value: '${routeProvider.currentDeviation.round()}m',
+                            valueColor: routeProvider.isDeviated
+                                ? Colors.red
+                                : Colors.green,
+                          ),
+                        ],
+                      ),
+
+                      if (routeProvider.isDeviated) ...[
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            routeProvider.resetDeviation();
+                          },
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text("I'M SAFE - Continue"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -578,5 +441,92 @@ class ActiveRouteMonitoringScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  // Fit route in view
+  void _fitRouteInView(GoogleMapController controller, RouteProvider provider) {
+    if (provider.startPosition != null && provider.endPosition != null) {
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          provider.startPosition!.latitude < provider.endPosition!.latitude
+              ? provider.startPosition!.latitude
+              : provider.endPosition!.latitude,
+          provider.startPosition!.longitude < provider.endPosition!.longitude
+              ? provider.startPosition!.longitude
+              : provider.endPosition!.longitude,
+        ),
+        northeast: LatLng(
+          provider.startPosition!.latitude > provider.endPosition!.latitude
+              ? provider.startPosition!.latitude
+              : provider.endPosition!.latitude,
+          provider.startPosition!.longitude > provider.endPosition!.longitude
+              ? provider.startPosition!.longitude
+              : provider.endPosition!.longitude,
+        ),
+      );
+
+      controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50));
+    }
+  }
+
+  // Stat item widget
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.grey, size: 20),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: valueColor ?? Colors.black,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Confirm stop
+  Future<void> _confirmStop(
+    BuildContext context,
+    RouteProvider provider,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Stop Monitoring'),
+        content: const Text('Are you sure you want to stop route monitoring?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Stop'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await provider.stopMonitoring();
+      if (context.mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      }
+    }
   }
 }
