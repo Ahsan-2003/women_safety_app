@@ -2,13 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+// import 'package:flutter_sms/flutter_sms.dart';
 import 'package:flutter_sms/flutter_sms.dart' as FlutterSms;
 import '../models/contact_model.dart';
 import '../models/offline_alert_model.dart';
 import '../services/connectivity_service.dart';
 import '../services/sms_service.dart';
 import '../services/location_service.dart';
+// import 'package:flutter_sms/flutter_sms.dart';
 
 class OfflineManagerProvider extends ChangeNotifier {
   final ConnectivityService _connectivityService = ConnectivityService();
@@ -18,50 +19,42 @@ class OfflineManagerProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   bool _isOnline = true;
-  bool _isOfflineMode = false;
-  final List<SmsQueueItem> _smsQueue = [];
+  bool _isInitialized = false;
+  List<SmsQueueItem> _smsQueue = [];
   StreamSubscription? _connectivitySubscription;
   String? _error;
 
   bool get isOnline => _isOnline;
-  bool get isOfflineMode => _isOfflineMode;
+  bool get isInitialized => _isInitialized;
+  bool get isOfflineMode => !_isOnline;
   List<SmsQueueItem> get smsQueue => _smsQueue;
   String? get error => _error;
+  int get queueCount => _smsQueue.length;
 
-  // Initialize offline manager
-  void initialize() {
-    _connectivityService.initialize();
+  // Initialize - MUST be called from main.dart or home screen
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    await _connectivityService.initialize();
     _isOnline = _connectivityService.isOnline;
+    _isInitialized = true;
 
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
-      results,
-    ) {
+    // Listen to connectivity changes
+    _connectivityService.addListener(() {
       final wasOnline = _isOnline;
-      _isOnline =
-          results.isNotEmpty && results.first != ConnectivityResult.none;
+      _isOnline = _connectivityService.isOnline;
 
       if (wasOnline && !_isOnline) {
-        _handleWentOffline();
+        debugPrint('🔴 WENT OFFLINE - SMS fallback activated');
       } else if (!wasOnline && _isOnline) {
-        _handleCameOnline();
+        debugPrint('🟢 BACK ONLINE - Processing SMS queue');
+        _processSmsQueue();
       }
 
       notifyListeners();
     });
-  }
 
-  // Handle going offline
-  void _handleWentOffline() {
-    _isOfflineMode = true;
-    debugPrint('📴 WENT OFFLINE - SMS fallback activated');
-    notifyListeners();
-  }
-
-  // Handle coming back online
-  void _handleCameOnline() {
-    _isOfflineMode = false;
-    debugPrint('📶 BACK ONLINE - Resuming normal operations');
-    _processSmsQueue();
+    debugPrint('✅ Offline Manager initialized. Online: $_isOnline');
     notifyListeners();
   }
 
@@ -72,7 +65,11 @@ class OfflineManagerProvider extends ChangeNotifier {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) return false;
+      if (user == null) {
+        _error = 'User not logged in';
+        notifyListeners();
+        return false;
+      }
 
       // Get current location
       final location = await _locationService.getCurrentLocation();
@@ -95,27 +92,23 @@ class OfflineManagerProvider extends ChangeNotifier {
           customMessage ??
           _composeDefaultMessage(type, location.latitude, location.longitude);
 
-      // Create alert model
-      final alert = OfflineAlertModel(
-        alertId: DateTime.now().millisecondsSinceEpoch.toString(),
-        userId: user.uid,
-        type: type,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: 'Coordinates: ${location.latitude}, ${location.longitude}',
-        timestamp: DateTime.now(),
-        message: message,
+      debugPrint(
+        '📤 Sending offline alert via SMS to ${contacts.length} contacts',
       );
 
-      // Try to send SMS
-      final success = await _smsService.sendGenericAlertSMS(
-        contacts: contacts,
-        alert: alert,
-      );
-
-      if (!success) {
-        // Queue for later
+      // Send SMS
+      bool success;
+      if (_isOnline) {
+        // Online - use normal SMS
+        success = await _smsService.sendSMSToMultipleNumbers(
+          phoneNumbers: contacts.map((c) => c.phoneNumber).toList(),
+          message: message,
+        );
+      } else {
+        // Offline - queue for later
         _queueSmsForLater(contacts, message);
+        success = true;
+        debugPrint('📥 SMS queued (offline mode)');
       }
 
       return success;
@@ -137,7 +130,7 @@ class OfflineManagerProvider extends ChangeNotifier {
       );
       _smsQueue.add(queueItem);
     }
-    debugPrint('${contacts.length} SMS messages queued');
+    debugPrint('📥 SMS queued: ${_smsQueue.length} messages pending');
     notifyListeners();
   }
 
@@ -145,7 +138,7 @@ class OfflineManagerProvider extends ChangeNotifier {
   Future<void> _processSmsQueue() async {
     if (_smsQueue.isEmpty) return;
 
-    debugPrint('Processing SMS queue: ${_smsQueue.length} messages');
+    debugPrint('📤 Processing SMS queue: ${_smsQueue.length} messages');
 
     for (var item in _smsQueue) {
       if (!item.sent) {
@@ -156,16 +149,15 @@ class OfflineManagerProvider extends ChangeNotifier {
           );
           item.sent = true;
           item.sentAt = DateTime.now();
-          debugPrint('Queued SMS sent to ${item.phoneNumber}');
+          debugPrint('✅ SMS sent to ${item.phoneNumber}');
         } catch (e) {
-          debugPrint('Failed to send queued SMS: $e');
+          debugPrint('❌ Failed to send queued SMS: $e');
         }
       }
     }
 
-    // Remove sent items
     _smsQueue.removeWhere((item) => item.sent);
-    debugPrint('Remaining SMS queue: ${_smsQueue.length}');
+    debugPrint('📤 Remaining queue: ${_smsQueue.length}');
     notifyListeners();
   }
 
@@ -190,7 +182,7 @@ class OfflineManagerProvider extends ChangeNotifier {
     }
   }
 
-  // Compose default message based on type
+  // Compose default message
   String _composeDefaultMessage(String type, double lat, double lng) {
     final mapsLink = 'https://maps.google.com/?q=$lat,$lng';
     final timeString = DateTime.now().toLocal().toString().substring(0, 16);
@@ -204,7 +196,7 @@ I need immediate help!
 📍 Location: $mapsLink
 🕐 Time: $timeString
 
-Sent offline via SMS''';
+Sent via SMS (offline mode)''';
       case 'checkin_timeout':
         return '''⚠️ SAFEWALK CHECK-IN TIMEOUT ⚠️
         
@@ -213,7 +205,7 @@ I didn't check in on time!
 📍 Location: $mapsLink
 🕐 Time: $timeString
 
-Sent offline via SMS''';
+Sent via SMS (offline mode)''';
       case 'route_deviation':
         return '''🛑 SAFEWALK ROUTE DEVIATION 🛑
         
@@ -222,37 +214,27 @@ I'm off my expected route!
 📍 Location: $mapsLink
 🕐 Time: $timeString
 
-Sent offline via SMS''';
+Sent via SMS (offline mode)''';
       default:
         return '''⚠️ SAFEWALK ALERT ⚠️
         
 📍 Location: $mapsLink
 🕐 Time: $timeString
 
-Sent offline via SMS''';
+Sent via SMS (offline mode)''';
     }
   }
 
-  // Check if online
+  // Check connection manually
   Future<bool> checkConnection() async {
-    _isOnline = await _connectivityService.hasInternetConnection();
-    _isOfflineMode = !_isOnline;
+    await _connectivityService.initialize();
+    _isOnline = _connectivityService.isOnline;
     notifyListeners();
     return _isOnline;
   }
 
-  // Clear SMS queue
-  void clearSmsQueue() {
-    _smsQueue.clear();
-    notifyListeners();
-  }
-
-  // Get queue count
-  int get queueCount => _smsQueue.length;
-
   @override
   void dispose() {
-    _connectivitySubscription?.cancel();
     _connectivityService.dispose();
     super.dispose();
   }

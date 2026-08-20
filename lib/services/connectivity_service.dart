@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 
-class ConnectivityService {
+class ConnectivityService extends ChangeNotifier {
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _subscription;
 
@@ -12,12 +12,9 @@ class ConnectivityService {
   bool get isOnline => _isOnline;
   ConnectivityResult get connectionType => _connectionType;
 
-  // Expose connectivity for listening
-  Connectivity get connectivity => _connectivity;
-
   // Initialize connectivity monitoring
-  void initialize() {
-    _checkInitialConnection();
+  Future<void> initialize() async {
+    await _checkInitialConnection();
     _startMonitoring();
   }
 
@@ -25,26 +22,30 @@ class ConnectivityService {
   Future<void> _checkInitialConnection() async {
     try {
       final results = await _connectivity.checkConnectivity();
-      if (results.isNotEmpty) {
-        _connectionType = results.first;
-        _isOnline = _connectionType != ConnectivityResult.none;
-      }
+      _updateConnectionStatus(results);
     } catch (e) {
       _isOnline = false;
     }
+    notifyListeners();
   }
 
   // Start monitoring connection changes
   void _startMonitoring() {
     _subscription = _connectivity.onConnectivityChanged.listen((results) {
-      if (results.isNotEmpty) {
-        _connectionType = results.first;
-        _isOnline = _connectionType != ConnectivityResult.none;
-        debugPrint(
-          'Connectivity changed: $_connectionType, Online: $_isOnline',
-        );
-      }
+      _updateConnectionStatus(results);
+      notifyListeners();
     });
+  }
+
+  // Update connection status
+  void _updateConnectionStatus(List<ConnectivityResult> results) {
+    if (results.isNotEmpty) {
+      _connectionType = results.first;
+      _isOnline = _connectionType != ConnectivityResult.none;
+    } else {
+      _isOnline = false;
+    }
+    debugPrint('📶 Connectivity: $_connectionType, Online: $_isOnline');
   }
 
   // Check if connected to internet
@@ -58,7 +59,9 @@ class ConnectivityService {
   }
 
   // Dispose subscription
+  @override
   void dispose() {
     _subscription?.cancel();
+    super.dispose();
   }
 }
