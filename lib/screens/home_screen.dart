@@ -77,7 +77,6 @@ class HomeScreen extends StatelessWidget {
       body: Column(
         children: [
           const OfflineStatusWidget(),
-
           Expanded(
             child: SafeArea(
               child: Padding(

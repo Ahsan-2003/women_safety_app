@@ -9,6 +9,7 @@ class OfflineStatusWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<OfflineManagerProvider>(
       builder: (context, provider, child) {
+        // Show banner only when offline
         if (provider.isOnline) {
           return const SizedBox.shrink(); // Hidden when online
         }
@@ -16,20 +17,39 @@ class OfflineStatusWidget extends StatelessWidget {
         return Container(
           width: double.infinity,
           color: Colors.orange,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
               const Icon(Icons.wifi_off, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'OFFLINE MODE - SMS alerts active',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'OFFLINE MODE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      'SMS alerts active - ${provider.queueCount} pending',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              // Retry button
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                onPressed: () async {
+                  await provider.checkConnection();
+                },
               ),
             ],
           ),
