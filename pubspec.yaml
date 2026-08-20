@@ -57,6 +57,7 @@ dependencies:
   shared_preferences: ^2.5.5
   latlong2: ^0.10.1
   connectivity_plus: ^7.3.1
+  google_maps_flutter: ^2.18.0
   # sms_advanced: ^1.1.0
   # firebase_app_check: ^0.4.6
   # android_app_checker: ^0.0.5
