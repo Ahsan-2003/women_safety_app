@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:women_safety_app/providers/fcm_provider.dart';
+import 'package:women_safety_app/providers/sos_provider.dart';
 import 'package:women_safety_app/screens/checkin_timer_screen.dart';
 import 'package:women_safety_app/screens/fake_call_screen.dart';
 import 'package:women_safety_app/screens/route_monitoring_screen.dart';
@@ -279,6 +280,19 @@ class HomeScreen extends StatelessWidget {
                           ),
                           child: const Text('Test Notification'),
                         ),
+                      ),
+
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () async {
+                          // Trigger SOS to test notifications
+                          final sosProvider = Provider.of<SOSProvider>(
+                            context,
+                            listen: false,
+                          );
+                          await sosProvider.triggerSOS();
+                        },
+                        child: const Text('Test SOS Notification'),
                       ),
 
                       // Sign Out Button
