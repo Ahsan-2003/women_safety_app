@@ -1,46 +1,18 @@
-import 'package:hive/hive.dart';
+import 'dart:convert';
 
-part 'session_history_model.g.dart';
-
-@HiveType(typeId: 0)
-class SessionHistoryModel extends HiveObject {
-  @HiveField(0)
+class SessionHistoryModel {
   final String sessionId;
-
-  @HiveField(1)
   final DateTime startTime;
-
-  @HiveField(2)
   final DateTime endTime;
-
-  @HiveField(3)
   final String durationMinutes;
-
-  @HiveField(4)
   final double startLatitude;
-
-  @HiveField(5)
   final double startLongitude;
-
-  @HiveField(6)
   final double? endLatitude;
-
-  @HiveField(7)
   final double? endLongitude;
-
-  @HiveField(8)
   final String destinationAddress;
-
-  @HiveField(9)
   final bool completedSafely;
-
-  @HiveField(10)
   final double totalDistanceKm;
-
-  @HiveField(11)
   final List<String> routePoints;
-
-  @HiveField(12)
   final int alertsTriggered;
 
   SessionHistoryModel({
@@ -58,4 +30,54 @@ class SessionHistoryModel extends HiveObject {
     this.routePoints = const [],
     this.alertsTriggered = 0,
   });
+
+  // Convert to Map for JSON storage
+  Map<String, dynamic> toMap() {
+    return {
+      'sessionId': sessionId,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
+      'durationMinutes': durationMinutes,
+      'startLatitude': startLatitude,
+      'startLongitude': startLongitude,
+      'endLatitude': endLatitude,
+      'endLongitude': endLongitude,
+      'destinationAddress': destinationAddress,
+      'completedSafely': completedSafely,
+      'totalDistanceKm': totalDistanceKm,
+      'routePoints': routePoints,
+      'alertsTriggered': alertsTriggered,
+    };
+  }
+
+  // Convert to JSON string
+  String toJson() => jsonEncode(toMap());
+
+  // Create from Map
+  factory SessionHistoryModel.fromMap(Map<String, dynamic> map) {
+    return SessionHistoryModel(
+      sessionId: map['sessionId'] ?? '',
+      startTime: map['startTime'] != null
+          ? DateTime.parse(map['startTime'])
+          : DateTime.now(),
+      endTime: map['endTime'] != null
+          ? DateTime.parse(map['endTime'])
+          : DateTime.now(),
+      durationMinutes: map['durationMinutes'] ?? '0',
+      startLatitude: (map['startLatitude'] ?? 0.0).toDouble(),
+      startLongitude: (map['startLongitude'] ?? 0.0).toDouble(),
+      endLatitude: map['endLatitude']?.toDouble(),
+      endLongitude: map['endLongitude']?.toDouble(),
+      destinationAddress: map['destinationAddress'] ?? '',
+      completedSafely: map['completedSafely'] ?? true,
+      totalDistanceKm: (map['totalDistanceKm'] ?? 0.0).toDouble(),
+      routePoints: List<String>.from(map['routePoints'] ?? []),
+      alertsTriggered: map['alertsTriggered'] ?? 0,
+    );
+  }
+
+  // Create from JSON string
+  factory SessionHistoryModel.fromJson(String json) {
+    return SessionHistoryModel.fromMap(jsonDecode(json));
+  }
 }
