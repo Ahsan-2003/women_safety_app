@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:women_safety_app/providers/fcm_provider.dart';
 import 'package:women_safety_app/screens/checkin_timer_screen.dart';
 import 'package:women_safety_app/screens/fake_call_screen.dart';
 import 'package:women_safety_app/screens/route_monitoring_screen.dart';
@@ -18,6 +19,10 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    // Initialize FCM when home screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<FCMProvider>(context, listen: false).initialize();
+    });
 
     return Scaffold(
       appBar: AppBar(

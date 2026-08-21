@@ -10,6 +10,7 @@ import 'package:women_safety_app/providers/route_provider.dart';
 import 'package:women_safety_app/providers/session_history_provider.dart';
 import 'package:women_safety_app/providers/session_provider.dart';
 import 'package:women_safety_app/providers/sos_provider.dart';
+import 'package:women_safety_app/providers/fcm_provider.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'screens/splash_screen.dart';
@@ -41,6 +42,7 @@ class SafeWalkApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => OfflineManagerProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => SessionHistoryProvider()),
+        ChangeNotifierProvider(create: (_) => FCMProvider()),
       ], // ADD THIS],
       child: MaterialApp(
         title: 'SafeWalk',
