@@ -4,6 +4,7 @@ import 'package:women_safety_app/providers/fcm_provider.dart';
 import 'package:women_safety_app/providers/offline_manager_provider.dart';
 import 'package:women_safety_app/providers/sos_provider.dart';
 import 'package:women_safety_app/screens/checkin_timer_screen.dart';
+import 'package:women_safety_app/screens/companion_dashboard_screen.dart';
 import 'package:women_safety_app/screens/fake_call_screen.dart';
 import 'package:women_safety_app/screens/route_monitoring_screen.dart';
 import 'package:women_safety_app/screens/session_history_screen.dart';
@@ -401,6 +402,23 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const SessionHistoryScreen()),
+            );
+          },
+        ),
+
+        const SizedBox(height: 10),
+
+        _buildListTile(
+          context,
+          icon: Icons.people,
+          title: 'Companion Mode',
+          subtitle: 'Monitor friends and family',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CompanionDashboardScreen(),
+              ),
             );
           },
         ),
