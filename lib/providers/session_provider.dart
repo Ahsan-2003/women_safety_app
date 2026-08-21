@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
+import 'package:women_safety_app/models/session_history_model.dart';
 import '../models/session_model.dart';
 import '../models/location_model.dart';
 import '../services/session_service.dart';
 import '../services/location_service.dart';
+import '../services/session_history_service.dart';
 
 class SessionProvider extends ChangeNotifier {
   final SessionService _sessionService = SessionService();
   final LocationService _locationService = LocationService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Uuid _uuid = const Uuid();
+  final SessionHistoryService _historyService = SessionHistoryService();
 
   SessionModel? _activeSession;
   LocationModel? _currentLocation;
@@ -171,8 +174,43 @@ class SessionProvider extends ChangeNotifier {
   }
 
   // User marks themselves as safe
+  // Future<void> markSafe() async {
+  //   await _endSession(safe: true);
+  // }
+
+  // Modify markSafe method to save history
   Future<void> markSafe() async {
-    await _endSession(safe: true);
+    if (_activeSession == null) return;
+
+    try {
+      await _sessionService.endSession(_activeSession!.sessionId);
+
+      // ✅ SAVE TO HISTORY
+      final historySession = SessionHistoryModel(
+        sessionId: _activeSession!.sessionId,
+        startTime: _activeSession!.startTime,
+        endTime: DateTime.now(),
+        durationMinutes: _elapsedSeconds.toString(),
+        startLatitude: _activeSession!.startLatitude,
+        startLongitude: _activeSession!.startLongitude,
+        destinationAddress: _activeSession!.destinationAddress ?? '',
+        completedSafely: true,
+        totalDistanceKm: 0, // Calculate if needed
+        alertsTriggered: 0,
+      );
+
+      await _historyService.initialize();
+      await _historyService.saveSession(historySession);
+
+      _activeSession = null;
+      _currentLocation = null;
+      _elapsedSeconds = 0;
+      _remainingSeconds = 0;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to end session: $e';
+      notifyListeners();
+    }
   }
 
   // Calculate times for display
