@@ -8,23 +8,46 @@ class SessionHistoryProvider extends ChangeNotifier {
   List<SessionHistoryModel> _sessions = [];
   bool _isLoading = false;
   String? _error;
-  String _filter = 'all'; // all, today, week, month
+  String _filter = 'all';
+  Map<String, dynamic> _stats = {};
 
   List<SessionHistoryModel> get sessions => _sessions;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String get filter => _filter;
+  Map<String, dynamic> get stats => _stats;
 
-  // Initialize
-  Future<void> initialize() async {
-    await _historyService.initialize();
+  // Initialize - no async needed with SharedPreferences
+  void initialize() {
     _loadSessions();
   }
 
   // Load sessions
-  void _loadSessions() {
-    _sessions = _historyService.getAllSessions();
+  Future<void> _loadSessions() async {
+    _isLoading = true;
     notifyListeners();
+
+    try {
+      _sessions = await _historyService.getAllSessions();
+      _applyFilter();
+      _loadStats();
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to load sessions: $e';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Load statistics
+  Future<void> _loadStats() async {
+    _stats = {
+      'totalSessions': await _historyService.getSessionCount(),
+      'totalDistance': await _historyService.getTotalDistance(),
+      'safeSessions': await _historyService.getSafeSessionsCount(),
+      'totalAlerts': await _historyService.getTotalAlerts(),
+    };
   }
 
   // Add new session
@@ -34,7 +57,7 @@ class SessionHistoryProvider extends ChangeNotifier {
 
     try {
       await _historyService.saveSession(session);
-      _loadSessions();
+      await _loadSessions();
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -47,57 +70,51 @@ class SessionHistoryProvider extends ChangeNotifier {
   // Delete session
   Future<void> deleteSession(String sessionId) async {
     await _historyService.deleteSession(sessionId);
-    _loadSessions();
+    await _loadSessions();
   }
 
   // Clear all sessions
   Future<void> clearAllSessions() async {
     await _historyService.clearAllSessions();
-    _loadSessions();
+    await _loadSessions();
   }
 
   // Set filter
   void setFilter(String newFilter) {
     _filter = newFilter;
     _applyFilter();
+    notifyListeners();
   }
 
   // Apply filter
-  void _applyFilter() {
+  Future<void> _applyFilter() async {
     final now = DateTime.now();
 
     switch (_filter) {
       case 'today':
-        _sessions = _historyService.getSessionsByDate(now);
+        _sessions = await _historyService.getSessionsByDate(now);
         break;
       case 'week':
         final weekAgo = now.subtract(const Duration(days: 7));
-        _sessions = _historyService
-            .getAllSessions()
+        final allSessions = await _historyService.getAllSessions();
+        _sessions = allSessions
             .where((s) => s.startTime.isAfter(weekAgo))
             .toList();
         break;
       case 'month':
         final monthAgo = now.subtract(const Duration(days: 30));
-        _sessions = _historyService
-            .getAllSessions()
+        final allSessions = await _historyService.getAllSessions();
+        _sessions = allSessions
             .where((s) => s.startTime.isAfter(monthAgo))
             .toList();
         break;
       default:
-        _sessions = _historyService.getAllSessions();
+        _sessions = await _historyService.getAllSessions();
     }
-
-    notifyListeners();
   }
 
   // Get stats
   Map<String, dynamic> getStats() {
-    return {
-      'totalSessions': _historyService.getSessionCount(),
-      'totalDistance': _historyService.getTotalDistance(),
-      'safeSessions': _historyService.getSafeSessionsCount(),
-      'totalAlerts': _historyService.getTotalAlerts(),
-    };
+    return _stats;
   }
 }

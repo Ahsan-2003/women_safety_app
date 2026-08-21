@@ -185,7 +185,8 @@ class SessionProvider extends ChangeNotifier {
     try {
       await _sessionService.endSession(_activeSession!.sessionId);
 
-      // ✅ SAVE TO HISTORY
+      // ✅ SAVE TO HISTORY - No initialization needed
+      final historyService = SessionHistoryService();
       final historySession = SessionHistoryModel(
         sessionId: _activeSession!.sessionId,
         startTime: _activeSession!.startTime,
@@ -195,12 +196,12 @@ class SessionProvider extends ChangeNotifier {
         startLongitude: _activeSession!.startLongitude,
         destinationAddress: _activeSession!.destinationAddress ?? '',
         completedSafely: true,
-        totalDistanceKm: 0, // Calculate if needed
+        totalDistanceKm: 0,
         alertsTriggered: 0,
       );
 
-      await _historyService.initialize();
-      await _historyService.saveSession(historySession);
+      await historyService.saveSession(historySession);
+      print('✅ Session saved to history');
 
       _activeSession = null;
       _currentLocation = null;
