@@ -32,7 +32,8 @@ class FCMService {
       iOS: iosSettings,
     );
 
-    await _localNotifications.initialize(settings);
+    // await _localNotifications.initialize(settings);
+    await _localNotifications.initialize(settings: settings);
   }
 
   // Request notification permissions
@@ -106,10 +107,10 @@ class FCMService {
     );
 
     await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      notification.title,
-      notification.body,
-      details,
+      title: notification.title,
+      body: notification.body,
+      notificationDetails: details,
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
   }
 
