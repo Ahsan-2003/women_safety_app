@@ -1,62 +1,112 @@
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../models/session_history_model.dart';
 
 class SessionHistoryService {
-  static const String _boxName = 'session_history';
-
-  // Initialize Hive
-  Future<void> initialize() async {
-    await Hive.initFlutter();
-
-    if (!Hive.isBoxOpen(_boxName)) {
-      await Hive.openBox<SessionHistoryModel>(_boxName);
-    }
-  }
+  static const String _storageKey = 'session_history_data';
 
   // Save session to local storage
   Future<void> saveSession(SessionHistoryModel session) async {
-    final box = Hive.box<SessionHistoryModel>(_boxName);
-    await box.put(session.sessionId, session);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Get existing sessions
+      final existingSessions = await getAllSessions();
+
+      // Check if session already exists
+      final sessionIndex = existingSessions.indexWhere(
+        (s) => s.sessionId == session.sessionId,
+      );
+
+      if (sessionIndex != -1) {
+        // Update existing session
+        existingSessions[sessionIndex] = session;
+      } else {
+        // Add new session
+        existingSessions.add(session);
+      }
+
+      // Convert to JSON list
+      final sessionsJson = existingSessions.map((s) => s.toJson()).toList();
+
+      // Save to SharedPreferences
+      await prefs.setStringList(_storageKey, sessionsJson);
+
+      print('✅ Session saved: ${session.sessionId}');
+    } catch (e) {
+      print('❌ Failed to save session: $e');
+    }
   }
 
   // Get all sessions (newest first)
-  List<SessionHistoryModel> getAllSessions() {
-    final box = Hive.box<SessionHistoryModel>(_boxName);
-    final sessions = box.values.toList();
+  Future<List<SessionHistoryModel>> getAllSessions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessionsJson = prefs.getStringList(_storageKey) ?? [];
 
-    // Sort by start time (newest first)
-    sessions.sort((a, b) => b.startTime.compareTo(a.startTime));
+      final sessions = sessionsJson
+          .map((json) => SessionHistoryModel.fromJson(json))
+          .toList();
 
-    return sessions;
+      // Sort by start time (newest first)
+      sessions.sort((a, b) => b.startTime.compareTo(a.startTime));
+
+      return sessions;
+    } catch (e) {
+      print('❌ Failed to get sessions: $e');
+      return [];
+    }
   }
 
   // Get session by ID
-  SessionHistoryModel? getSession(String sessionId) {
-    final box = Hive.box<SessionHistoryModel>(_boxName);
-    return box.get(sessionId);
+  Future<SessionHistoryModel?> getSession(String sessionId) async {
+    final sessions = await getAllSessions();
+    for (var session in sessions) {
+      if (session.sessionId == sessionId) {
+        return session;
+      }
+    }
+    return null;
   }
 
   // Delete session
   Future<void> deleteSession(String sessionId) async {
-    final box = Hive.box<SessionHistoryModel>(_boxName);
-    await box.delete(sessionId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessions = await getAllSessions();
+
+      sessions.removeWhere((s) => s.sessionId == sessionId);
+
+      final sessionsJson = sessions.map((s) => s.toJson()).toList();
+      await prefs.setStringList(_storageKey, sessionsJson);
+
+      print('✅ Session deleted: $sessionId');
+    } catch (e) {
+      print('❌ Failed to delete session: $e');
+    }
   }
 
   // Delete all sessions
   Future<void> clearAllSessions() async {
-    final box = Hive.box<SessionHistoryModel>(_boxName);
-    await box.clear();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_storageKey);
+      print('✅ All sessions cleared');
+    } catch (e) {
+      print('❌ Failed to clear sessions: $e');
+    }
   }
 
   // Get session count
-  int getSessionCount() {
-    final box = Hive.box<SessionHistoryModel>(_boxName);
-    return box.length;
+  Future<int> getSessionCount() async {
+    final sessions = await getAllSessions();
+    return sessions.length;
   }
 
   // Get sessions for specific date
-  List<SessionHistoryModel> getSessionsByDate(DateTime date) {
-    return getAllSessions().where((session) {
+  Future<List<SessionHistoryModel>> getSessionsByDate(DateTime date) async {
+    final sessions = await getAllSessions();
+    return sessions.where((session) {
       return session.startTime.year == date.year &&
           session.startTime.month == date.month &&
           session.startTime.day == date.day;
@@ -64,20 +114,28 @@ class SessionHistoryService {
   }
 
   // Get total distance walked
-  double getTotalDistance() {
-    return getAllSessions().fold(
-      0,
-      (sum, session) => sum + session.totalDistanceKm,
-    );
+  Future<double> getTotalDistance() async {
+    final sessions = await getAllSessions();
+    double total = 0;
+    for (var session in sessions) {
+      total += session.totalDistanceKm;
+    }
+    return total;
   }
 
   // Get total sessions completed safely
-  int getSafeSessionsCount() {
-    return getAllSessions().where((s) => s.completedSafely).length;
+  Future<int> getSafeSessionsCount() async {
+    final sessions = await getAllSessions();
+    return sessions.where((s) => s.completedSafely).length;
   }
 
   // Get total alerts triggered
-  int getTotalAlerts() {
-    return getAllSessions().fold(0, (sum, s) => sum + s.alertsTriggered);
+  Future<int> getTotalAlerts() async {
+    final sessions = await getAllSessions();
+    int total = 0;
+    for (var session in sessions) {
+      total += session.alertsTriggered;
+    }
+    return total;
   }
 }
