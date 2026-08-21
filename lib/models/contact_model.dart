@@ -3,12 +3,16 @@ class ContactModel {
   final String name;
   final String phoneNumber;
   final DateTime addedAt;
+  final bool isActive;
+  final String? fcmToken; // ADD THIS
 
   ContactModel({
     required this.id,
     required this.name,
     required this.phoneNumber,
     required this.addedAt,
+    this.isActive = true,
+    this.fcmToken, // ADD THIS
   });
 
   Map<String, dynamic> toMap() {
@@ -17,6 +21,8 @@ class ContactModel {
       'name': name,
       'phoneNumber': phoneNumber,
       'addedAt': addedAt.toIso8601String(),
+      'isActive': isActive,
+      'fcmToken': fcmToken, // ADD THIS
     };
   }
 
@@ -28,6 +34,8 @@ class ContactModel {
       addedAt: map['addedAt'] != null
           ? DateTime.parse(map['addedAt'])
           : DateTime.now(),
+      isActive: map['isActive'] ?? true,
+      fcmToken: map['fcmToken'], // ADD THIS
     );
   }
 }
