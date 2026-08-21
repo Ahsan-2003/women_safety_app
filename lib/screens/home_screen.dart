@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:women_safety_app/screens/checkin_timer_screen.dart';
 import 'package:women_safety_app/screens/fake_call_screen.dart';
 import 'package:women_safety_app/screens/route_monitoring_screen.dart';
+import 'package:women_safety_app/screens/session_history_screen.dart';
 import 'package:women_safety_app/screens/sos_screen.dart';
 import 'package:women_safety_app/screens/start_session_screen.dart';
 import 'package:women_safety_app/services/notification_service.dart';
@@ -237,6 +238,22 @@ class HomeScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const RouteMonitoringScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 24),
+                      _buildMenuButton(
+                        context,
+                        icon: Icons.history,
+                        title: 'Session History',
+                        subtitle: 'View your past walks',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SessionHistoryScreen(),
                             ),
                           );
                         },
