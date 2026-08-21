@@ -5,13 +5,26 @@ import '../models/location_model.dart';
 class SessionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Generate shareable link
+  String generateShareableLink(String sessionId) {
+    // Replace with your actual web hosting URL
+    return 'https://safewalk-app.web.app/?session=$sessionId';
+  }
+
   // Start a new session
   Future<String> startSession(SessionModel session) async {
     try {
+      // Add shareable link to session
+      final sessionWithLink = session.toMap();
+      sessionWithLink['shareableLink'] = generateShareableLink(
+        session.sessionId,
+      );
+
       await _firestore
           .collection('sessions')
           .doc(session.sessionId)
-          .set(session.toMap());
+          .set(sessionWithLink);
+
       return session.sessionId;
     } catch (e) {
       throw Exception('Failed to start session: $e');
@@ -42,7 +55,7 @@ class SessionService {
     }
   }
 
-  // End session (mark as safe)
+  // ✅ ADD THIS METHOD - End session (mark as safe)
   Future<void> endSession(String sessionId) async {
     try {
       await _firestore.collection('sessions').doc(sessionId).update({
@@ -55,7 +68,7 @@ class SessionService {
     }
   }
 
-  // Get active session for user
+  // ✅ ADD THIS METHOD - Get active session for user
   Future<SessionModel?> getActiveSession(String userId) async {
     try {
       QuerySnapshot query = await _firestore
@@ -76,7 +89,21 @@ class SessionService {
     }
   }
 
-  // Get session stream for real-time updates
+  // ✅ ADD THIS METHOD - Get session by ID (for web view)
+  Future<SessionModel?> getSession(String sessionId) async {
+    try {
+      final doc = await _firestore.collection('sessions').doc(sessionId).get();
+
+      if (doc.exists) {
+        return SessionModel.fromMap(doc.data() as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ✅ ADD THIS METHOD - Get session stream for real-time updates
   Stream<SessionModel?> sessionStream(String sessionId) {
     return _firestore.collection('sessions').doc(sessionId).snapshots().map((
       doc,

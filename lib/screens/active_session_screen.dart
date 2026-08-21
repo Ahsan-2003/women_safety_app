@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:women_safety_app/screens/sos_screen.dart';
 import '../providers/session_provider.dart';
+import 'package:women_safety_app/screens/share_link_screen.dart';
 import 'home_screen.dart'; // ADD THIS IMPORT
 
 class ActiveSessionScreen extends StatelessWidget {
@@ -65,6 +66,18 @@ class ActiveSessionScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+
+                IconButton(
+                  icon: const Icon(Icons.share, color: Colors.white),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ShareLinkScreen(),
+                      ),
+                    );
+                  },
                 ),
 
                 const Spacer(),

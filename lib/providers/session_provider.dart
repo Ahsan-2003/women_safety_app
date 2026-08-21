@@ -81,6 +81,9 @@ class SessionProvider extends ChangeNotifier {
       final sessionId = _uuid.v4();
       final now = DateTime.now();
 
+      // ✅ FIX: Use service method for shareable link
+      final shareableLink = _sessionService.generateShareableLink(sessionId);
+
       final session = SessionModel(
         sessionId: sessionId,
         userId: user.uid,
@@ -89,7 +92,7 @@ class SessionProvider extends ChangeNotifier {
         destinationAddress: destinationAddress,
         startTime: now,
         expectedEndTime: now.add(Duration(minutes: durationMinutes)),
-        shareableLink: 'https://safewalk.app/session/$sessionId',
+        shareableLink: shareableLink, // ✅ FIXED
       );
 
       await _sessionService.startSession(session);
@@ -174,18 +177,13 @@ class SessionProvider extends ChangeNotifier {
   }
 
   // User marks themselves as safe
-  // Future<void> markSafe() async {
-  //   await _endSession(safe: true);
-  // }
-
-  // Modify markSafe method to save history
   Future<void> markSafe() async {
     if (_activeSession == null) return;
 
     try {
       await _sessionService.endSession(_activeSession!.sessionId);
 
-      // ✅ SAVE TO HISTORY - No initialization needed
+      // Save to history
       final historyService = SessionHistoryService();
       final historySession = SessionHistoryModel(
         sessionId: _activeSession!.sessionId,

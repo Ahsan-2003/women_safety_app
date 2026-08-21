@@ -13,6 +13,11 @@ class SessionModel {
   final List<String> notifiedContacts;
   final String shareableLink;
 
+  // ADD THESE FIELDS
+  final double? currentLatitude;
+  final double? currentLongitude;
+  final DateTime? lastUpdateTime;
+
   SessionModel({
     required this.sessionId,
     required this.userId,
@@ -27,6 +32,9 @@ class SessionModel {
     this.isSafe = false,
     this.notifiedContacts = const [],
     required this.shareableLink,
+    this.currentLatitude, // ADD THIS
+    this.currentLongitude, // ADD THIS
+    this.lastUpdateTime, // ADD THIS
   });
 
   Map<String, dynamic> toMap() {
@@ -44,6 +52,9 @@ class SessionModel {
       'isSafe': isSafe,
       'notifiedContacts': notifiedContacts,
       'shareableLink': shareableLink,
+      'currentLatitude': currentLatitude, // ADD THIS
+      'currentLongitude': currentLongitude, // ADD THIS
+      'lastUpdateTime': lastUpdateTime?.toIso8601String(), // ADD THIS
     };
   }
 
@@ -66,6 +77,11 @@ class SessionModel {
       isSafe: map['isSafe'] ?? false,
       notifiedContacts: List<String>.from(map['notifiedContacts'] ?? []),
       shareableLink: map['shareableLink'] ?? '',
+      currentLatitude: map['currentLatitude']?.toDouble(), // ADD THIS
+      currentLongitude: map['currentLongitude']?.toDouble(), // ADD THIS
+      lastUpdateTime: map['lastUpdateTime'] != null
+          ? DateTime.parse(map['lastUpdateTime'])
+          : null, // ADD THIS
     );
   }
 }

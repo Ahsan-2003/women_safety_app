@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeWalk - Live Location</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    
+     <!-- ✅ GOOGLE MAPS API - YOUR KEY IS HERE -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCixlld6nX_Q3sS9KyEw6U6tgJVys2SCJo&callback=initMap" async defer></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: #6C63FF;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header h1 {
+            font-size: 18px;
+        }
+        
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-active {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status-ended {
+            background: #f44336;
+            color: white;
+        }
+        
+        .map-container {
+            height: 60vh;
+            width: 100%;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .info-panel {
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            margin: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .alert-banner {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+        
+        .alert-banner.active {
+            display: block;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #6C63FF;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading session...</p>
+    </div>
+    
+    <div id="content" style="display: none;">
+        <!-- Header -->
+        <div class="header">
+            <h1>🛡️ SafeWalk</h1>
+            <span id="statusBadge" class="status-badge status-active">LIVE</span>
+        </div>
+        
+        <!-- Alert Banner -->
+        <div id="alertBanner" class="alert-banner">
+            ⚠️ EMERGENCY ALERT ACTIVATED
+        </div>
+        
+        <!-- Map -->
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <!-- Info Panel -->
+        <div class="info-panel">
+            <div class="info-row">
+                <span class="info-label">Status</span>
+                <span id="sessionStatus" class="info-value">Active</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Started</span>
+                <span id="startTime" class="info-value">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Expected End</span>
+                <span id="endTime" class="info-value">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Last Update</span>
+                <span id="lastUpdate" class="info-value">--</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Distance from Start</span>
+                <span id="distance" class="info-value">--</span>
+            </div>
+        </div>
+        
+        <!-- Call Button -->
+        <div style="padding: 10px;">
+            <button id="callButton" style="width: 100%; padding: 15px; background: #4CAF50; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold;">
+                📞 Call Contact
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBYsFuL9NSIpuwVO9zyh66f6CRz_MRKW6I",
+            authDomain: "first-project-5720f.firebaseapp.com",
+            projectId: "first-project-5720f",
+            storageBucket: "first-project-5720f.firebasestorage.app",
+            messagingSenderId: "150199405061",
+            appId: "1:150199405061:web:33957111577a037b30aa6c"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        let map;
+        let marker;
+        let sessionId;
+        let sessionData;
+        
+        // Get session ID from URL
+        function getSessionIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('session');
+        }
+        
+        // Initialize map
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 15,
+                center: { lat: 0, lng: 0 },
+                mapTypeId: 'roadmap',
+            });
+            
+            marker = new google.maps.Marker({
+                map: map,
+                title: 'User Location',
+            });
+        }
+        
+        // Load session data
+        function loadSession() {
+            sessionId = getSessionIdFromUrl();
+            
+            if (!sessionId) {
+                showError('No session ID provided');
+                return;
+            }
+            
+            // Listen to session document
+            db.collection('sessions').doc(sessionId)
+                .onSnapshot((doc) => {
+                    if (doc.exists) {
+                        sessionData = doc.data();
+                        updateUI(sessionData);
+                    } else {
+                        showError('Session not found');
+                    }
+                }, (error) => {
+                    showError('Error loading session: ' + error.message);
+                });
+        }
+        
+        // Update UI with session data
+        function updateUI(data) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+            
+            // Update status
+            const isActive = data.isActive;
+            const statusBadge = document.getElementById('statusBadge');
+            const sessionStatus = document.getElementById('sessionStatus');
+            
+            if (isActive) {
+                statusBadge.className = 'status-badge status-active';
+                statusBadge.textContent = 'LIVE';
+                sessionStatus.textContent = 'Active';
+            } else {
+                statusBadge.className = 'status-badge status-ended';
+                statusBadge.textContent = 'ENDED';
+                sessionStatus.textContent = 'Ended';
+            }
+            
+            // Update times
+            if (data.startTime) {
+                document.getElementById('startTime').textContent = 
+                    new Date(data.startTime).toLocaleString();
+            }
+            
+            if (data.expectedEndTime) {
+                document.getElementById('endTime').textContent = 
+                    new Date(data.expectedEndTime).toLocaleString();
+            }
+            
+            // Update location
+            if (data.currentLatitude && data.currentLongitude) {
+                const position = {
+                    lat: data.currentLatitude,
+                    lng: data.currentLongitude
+                };
+                
+                marker.setPosition(position);
+                map.setCenter(position);
+                
+                document.getElementById('lastUpdate').textContent = 
+                    new Date().toLocaleString();
+                
+                // Calculate distance from start
+                if (data.startLatitude && data.startLongitude) {
+                    const distance = calculateDistance(
+                        data.startLatitude,
+                        data.startLongitude,
+                        data.currentLatitude,
+                        data.currentLongitude
+                    );
+                    document.getElementById('distance').textContent = 
+                        distance.toFixed(2) + ' km';
+                }
+            }
+            
+            // Check for SOS alerts
+            checkForAlerts(data.userId);
+        }
+        
+        // Check for active SOS alerts
+        function checkForAlerts(userId) {
+            db.collection('sos_alerts')
+                .where('userId', '==', userId)
+                .where('isActive', '==', true)
+                .onSnapshot((snapshot) => {
+                    const alertBanner = document.getElementById('alertBanner');
+                    if (!snapshot.empty) {
+                        alertBanner.classList.add('active');
+                    } else {
+                        alertBanner.classList.remove('active');
+                    }
+                });
+        }
+        
+        // Calculate distance between two coordinates
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        // Show error
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('content').innerHTML = 
+                '<div style="text-align: center; padding: 50px;">' +
+                '<h2>Error</h2>' +
+                '<p>' + message + '</p>' +
+                '</div>';
+        }
+        
+        // Call button
+        document.getElementById('callButton').addEventListener('click', function() {
+            // In real app, this would have the user's phone number
+            alert('Calling contact...');
+        });
+        
+        // Load session on page load
+        window.onload = function() {
+            loadSession();
+        };
+    </script>
+</body>
+</html>
