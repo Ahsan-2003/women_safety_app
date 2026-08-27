@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
@@ -22,6 +23,12 @@ class SessionProvider extends ChangeNotifier {
   int _elapsedSeconds = 0;
   int _remainingSeconds = 0;
 
+  // ADD: Timer and StreamSubscription
+  Timer? _timer;
+  StreamSubscription? _locationSubscription;
+  bool _isTimerRunning = false;
+  bool _isLocationTracking = false;
+
   SessionModel? get activeSession => _activeSession;
   LocationModel? get currentLocation => _currentLocation;
   bool get isLoading => _isLoading;
@@ -30,6 +37,8 @@ class SessionProvider extends ChangeNotifier {
       _activeSession != null && _activeSession!.isActive;
   int get elapsedSeconds => _elapsedSeconds;
   int get remainingSeconds => _remainingSeconds;
+  bool get isTimerRunning => _isTimerRunning;
+  bool get isLocationTracking => _isLocationTracking;
 
   // Check for existing active session
   Future<void> checkActiveSession() async {
@@ -40,6 +49,8 @@ class SessionProvider extends ChangeNotifier {
       _activeSession = await _sessionService.getActiveSession(user.uid);
       if (_activeSession != null) {
         _calculateTimes();
+        _startTimer();
+        _startLocationTracking(_activeSession!.sessionId);
       }
       notifyListeners();
     } catch (e) {
@@ -81,7 +92,6 @@ class SessionProvider extends ChangeNotifier {
       final sessionId = _uuid.v4();
       final now = DateTime.now();
 
-      // ✅ FIX: Use service method for shareable link
       final shareableLink = _sessionService.generateShareableLink(sessionId);
 
       final session = SessionModel(
@@ -92,16 +102,19 @@ class SessionProvider extends ChangeNotifier {
         destinationAddress: destinationAddress,
         startTime: now,
         expectedEndTime: now.add(Duration(minutes: durationMinutes)),
-        shareableLink: shareableLink, // ✅ FIXED
+        shareableLink: shareableLink,
       );
 
       await _sessionService.startSession(session);
       _activeSession = session;
       _currentLocation = location;
       _remainingSeconds = durationMinutes * 60;
+      _elapsedSeconds = 0;
 
       // Start location tracking
       _startLocationTracking(sessionId);
+
+      // Start timer
       _startTimer();
 
       _isLoading = false;
@@ -117,7 +130,10 @@ class SessionProvider extends ChangeNotifier {
 
   // Track location updates
   void _startLocationTracking(String sessionId) {
-    _locationService.getLocationStream().listen(
+    _locationSubscription?.cancel();
+    _isLocationTracking = true;
+
+    _locationSubscription = _locationService.getLocationStream().listen(
       (location) async {
         _currentLocation = location;
         notifyListeners();
@@ -133,6 +149,7 @@ class SessionProvider extends ChangeNotifier {
       },
       onError: (error) {
         _error = 'Location tracking error: $error';
+        _isLocationTracking = false;
         notifyListeners();
       },
     );
@@ -140,23 +157,67 @@ class SessionProvider extends ChangeNotifier {
 
   // Start countdown timer
   void _startTimer() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
+    _timer?.cancel();
+    _isTimerRunning = true;
 
-      if (!isSessionActive) return false;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!isSessionActive) {
+        timer.cancel();
+        _isTimerRunning = false;
+        return;
+      }
 
       _elapsedSeconds++;
       _remainingSeconds--;
 
       if (_remainingSeconds <= 0) {
-        // Time's up - trigger alert
-        await _endSession(safe: false);
-        return false;
+        timer.cancel();
+        _isTimerRunning = false;
+        _handleTimerExpired();
       }
 
       notifyListeners();
-      return true;
     });
+  }
+
+  // Handle timer expiration
+  Future<void> _handleTimerExpired() async {
+    if (_activeSession == null) return;
+
+    try {
+      // Get last known location
+      final location = await _locationService.getCurrentLocation();
+
+      // End session without safe confirmation
+      await _sessionService.endSession(_activeSession!.sessionId);
+
+      // Save to history with alert
+      final historyService = SessionHistoryService();
+      final historySession = SessionHistoryModel(
+        sessionId: _activeSession!.sessionId,
+        startTime: _activeSession!.startTime,
+        endTime: DateTime.now(),
+        durationMinutes: _elapsedSeconds.toString(),
+        startLatitude: _activeSession!.startLatitude,
+        startLongitude: _activeSession!.startLongitude,
+        destinationAddress: _activeSession!.destinationAddress ?? '',
+        completedSafely: false, // NOT safe
+        totalDistanceKm: 0,
+        alertsTriggered: 1, // Alert was triggered
+      );
+
+      await historyService.saveSession(historySession);
+      print('⚠️ Session expired - alert triggered');
+
+      _activeSession = null;
+      _currentLocation = null;
+      _elapsedSeconds = 0;
+      _remainingSeconds = 0;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to handle timer expiry: $e';
+      notifyListeners();
+    }
   }
 
   // End session (safe arrival or timeout)
@@ -165,6 +226,12 @@ class SessionProvider extends ChangeNotifier {
 
     try {
       await _sessionService.endSession(_activeSession!.sessionId);
+
+      _timer?.cancel();
+      _locationSubscription?.cancel();
+      _isTimerRunning = false;
+      _isLocationTracking = false;
+
       _activeSession = null;
       _currentLocation = null;
       _elapsedSeconds = 0;
@@ -201,6 +268,12 @@ class SessionProvider extends ChangeNotifier {
       await historyService.saveSession(historySession);
       print('✅ Session saved to history');
 
+      // Clean up
+      _timer?.cancel();
+      _locationSubscription?.cancel();
+      _isTimerRunning = false;
+      _isLocationTracking = false;
+
       _activeSession = null;
       _currentLocation = null;
       _elapsedSeconds = 0;
@@ -208,6 +281,65 @@ class SessionProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _error = 'Failed to end session: $e';
+      notifyListeners();
+    }
+  }
+
+  // ✅ ADD: Cancel/End Session (without saving to history as safe)
+  Future<void> cancelSession() async {
+    if (_activeSession == null) return;
+
+    try {
+      await _sessionService.endSession(_activeSession!.sessionId);
+
+      // Clean up
+      _timer?.cancel();
+      _locationSubscription?.cancel();
+      _isTimerRunning = false;
+      _isLocationTracking = false;
+
+      _activeSession = null;
+      _currentLocation = null;
+      _elapsedSeconds = 0;
+      _remainingSeconds = 0;
+      notifyListeners();
+
+      print('🛑 Session cancelled');
+    } catch (e) {
+      _error = 'Failed to cancel session: $e';
+      notifyListeners();
+    }
+  }
+
+  // ✅ ADD: Pause Session
+  void pauseSession() {
+    _timer?.cancel();
+    _isTimerRunning = false;
+    notifyListeners();
+  }
+
+  // ✅ ADD: Resume Session
+  void resumeSession() {
+    if (_activeSession != null && _activeSession!.isActive) {
+      _startTimer();
+    }
+  }
+
+  // ✅ ADD: Extend Session Time
+  Future<void> extendSession(int additionalMinutes) async {
+    if (_activeSession == null) return;
+
+    _remainingSeconds += additionalMinutes * 60;
+
+    // Update in Firestore
+    try {
+      await _sessionService.extendSession(
+        _activeSession!.sessionId,
+        additionalMinutes,
+      );
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to extend session: $e';
       notifyListeners();
     }
   }
@@ -237,4 +369,11 @@ class SessionProvider extends ChangeNotifier {
 
   // Get elapsed time string
   String get elapsedTimeString => formatTime(_elapsedSeconds);
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _locationSubscription?.cancel();
+    super.dispose();
+  }
 }

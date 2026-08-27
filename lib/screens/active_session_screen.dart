@@ -429,7 +429,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen>
               );
 
               if (confirm == true) {
-                await provider.cancelTimer();
+                await provider.cancelSession();
                 if (context.mounted) {
                   Navigator.pushAndRemoveUntil(
                     context,
