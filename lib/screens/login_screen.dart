@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen>
         children: [
           // Top decorative container
           Container(
-            height: 280,
+            height: 300,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
